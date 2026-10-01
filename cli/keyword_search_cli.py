@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from constants import BM25_K1
+from constants import BM25_B, BM25_K1
 from inverted_index import InvertedIndex
 from search_utils import tokenize, tokenize_term
 
@@ -66,10 +66,12 @@ def bm25_idf_command(term: str) -> float:
     return index.get_bm25_idf(token)
 
 
-def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+def bm25_tf_command(
+    doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25_B
+) -> float:
     index = load_index()
     token = tokenize_term(term)
-    return index.get_bm25_tf(doc_id, token, k1)
+    return index.get_bm25_tf(doc_id, token, k1, b)
 
 
 def build_command() -> None:
@@ -111,6 +113,9 @@ def main() -> None:
     bm25_tf_parser.add_argument(
         "k1", type=float, nargs="?", default=BM25_K1, help="Tunable BM25 K1 parameter"
     )
+    bm25_tf_parser.add_argument(
+        "b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter"
+    )
 
     args = parser.parse_args()
 
@@ -127,7 +132,7 @@ def main() -> None:
             bm25idf = bm25_idf_command(args.term)
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
         case "bm25tf":
-            bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+            bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
         case "build":
             build_command()
