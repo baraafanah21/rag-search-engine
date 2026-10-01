@@ -62,6 +62,17 @@ class InvertedIndex:
         length_norm = 1 - b + b * length_ratio
         return (tf * (k1 + 1)) / (tf + k1 * length_norm)
 
+    def bm25(self, doc_id: int, term: str) -> float:
+        return self.get_bm25_tf(doc_id, term) * self.get_bm25_idf(term)
+
+    def bm25_search(self, query: str, limit: int) -> list[tuple[dict, float]]:
+        query_tokens = tokenize(query)
+        scores: dict[int, float] = {}
+        for doc_id in self.docmap:
+            scores[doc_id] = sum(self.bm25(doc_id, token) for token in query_tokens)
+        ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        return [(self.docmap[doc_id], score) for doc_id, score in ranked[:limit]]
+
     def get_tf_idf(self, doc_id: int, term: str) -> float:
         return self.get_tf(doc_id, term) * self.get_idf(term)
 

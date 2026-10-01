@@ -74,6 +74,13 @@ def bm25_tf_command(
     return index.get_bm25_tf(doc_id, token, k1, b)
 
 
+def bm25_search_command(query: str, limit: int) -> None:
+    index = load_index()
+    results = index.bm25_search(query, limit)
+    for i, (movie, score) in enumerate(results, start=1):
+        print(f"{i}. ({movie['id']}) {movie['title']} - Score: {score:.2f}")
+
+
 def build_command() -> None:
     index = InvertedIndex()
     index.build()
@@ -117,6 +124,14 @@ def main() -> None:
         "b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter"
     )
 
+    bm25search_parser = subparsers.add_parser(
+        "bm25search", help="Search movies using full BM25 scoring"
+    )
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument(
+        "--limit", type=int, default=MAX_RESULTS, help="Maximum number of results"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -134,6 +149,8 @@ def main() -> None:
         case "bm25tf":
             bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
+        case "bm25search":
+            bm25_search_command(args.query, args.limit)
         case "build":
             build_command()
         case _:
