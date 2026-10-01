@@ -37,6 +37,9 @@ class InvertedIndex:
         term_doc_count = len(self.index.get(term, set()))
         return math.log((doc_count + 1) / (term_doc_count + 1))
 
+    def get_tf_idf(self, doc_id: int, term: str) -> float:
+        return self.get_tf(doc_id, term) * self.get_idf(term)
+
     def build(self) -> None:
         for movie in load_movies():
             doc_id = movie["id"]
