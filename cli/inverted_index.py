@@ -37,6 +37,11 @@ class InvertedIndex:
         term_doc_count = len(self.index.get(term, set()))
         return math.log((doc_count + 1) / (term_doc_count + 1))
 
+    def get_bm25_idf(self, term: str) -> float:
+        doc_count = len(self.docmap)
+        term_doc_count = len(self.index.get(term, set()))
+        return math.log((doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
+
     def get_tf_idf(self, doc_id: int, term: str) -> float:
         return self.get_tf(doc_id, term) * self.get_idf(term)
 
