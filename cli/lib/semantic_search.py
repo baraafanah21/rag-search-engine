@@ -10,6 +10,17 @@ CACHE_DIR = "cache"
 EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
 
 
+def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+
+
 class SemanticSearch:
     def __init__(self) -> None:
         self.model = SentenceTransformer(MODEL_NAME)
@@ -41,6 +52,20 @@ class SemanticSearch:
             if len(self.embeddings) == len(documents):
                 return self.embeddings
         return self.build_embeddings(documents)
+
+    def search(self, query: str, limit: int) -> list[dict]:
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+        query_embedding = self.generate_embedding(query)
+        scored = [
+            (cosine_similarity(query_embedding, doc_embedding), doc)
+            for doc_embedding, doc in zip(self.embeddings, self.documents)
+        ]
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [
+            {"score": score, "title": doc["title"], "description": doc["description"]}
+            for score, doc in scored[:limit]
+        ]
 
 
 def verify_model() -> None:
