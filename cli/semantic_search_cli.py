@@ -1,6 +1,6 @@
 import argparse
 
-from lib.semantic_search import embed_text, verify_model
+from lib.semantic_search import embed_text, verify_embeddings, verify_model
 
 
 def main() -> None:
@@ -12,6 +12,10 @@ def main() -> None:
     embed_text_parser = subparsers.add_parser("embed_text", help="Generate an embedding for a text")
     embed_text_parser.add_argument("text", type=str, help="Text to embed")
 
+    subparsers.add_parser(
+        "verify_embeddings", help="Build or load movie embeddings and print their shape"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -19,6 +23,8 @@ def main() -> None:
             verify_model()
         case "embed_text":
             embed_text(args.text)
+        case "verify_embeddings":
+            verify_embeddings()
         case _:
             parser.print_help()
 
