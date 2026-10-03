@@ -6,6 +6,7 @@ from nltk.stem import PorterStemmer
 MOVIES_PATH = "data/movies.json"
 STOP_WORDS_PATH = "data/stopwords.txt"
 PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
+SCORE_PRECISION = 4
 
 stemmer = PorterStemmer()
 
@@ -41,3 +42,15 @@ def load_movies() -> list[dict]:
     with open(MOVIES_PATH, "r") as f:
         data = json.load(f)
     return data["movies"]
+
+
+def format_search_result(
+    doc_id: int, title: str, document: str, score: float, metadata: dict | None = None
+) -> dict:
+    return {
+        "id": doc_id,
+        "title": title,
+        "document": document,
+        "score": round(score, SCORE_PRECISION),
+        "metadata": metadata or {},
+    }

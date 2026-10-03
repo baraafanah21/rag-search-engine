@@ -5,7 +5,7 @@ import re
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from search_utils import load_movies
+from search_utils import format_search_result, load_movies
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 CACHE_DIR = "cache"
@@ -140,6 +140,48 @@ class ChunkedSemanticSearch(SemanticSearch):
                 self.chunk_metadata = json.load(f)["chunks"]
             return self.chunk_embeddings
         return self.build_chunk_embeddings(documents)
+
+    def search_chunks(self, query: str, limit: int = 10) -> list[dict]:
+        if self.chunk_embeddings is None or self.chunk_metadata is None:
+            raise ValueError(
+                "No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first."
+            )
+        query_embedding = self.generate_embedding(query)
+
+        chunk_scores = []
+        for chunk_embedding, metadata in zip(self.chunk_embeddings, self.chunk_metadata):
+            chunk_scores.append(
+                {
+                    "chunk_idx": metadata["chunk_idx"],
+                    "movie_idx": metadata["movie_idx"],
+                    "score": float(cosine_similarity(query_embedding, chunk_embedding)),
+                }
+            )
+
+        best_by_movie: dict[int, dict] = {}
+        for chunk_score in chunk_scores:
+            movie_idx = chunk_score["movie_idx"]
+            if (
+                movie_idx not in best_by_movie
+                or chunk_score["score"] > best_by_movie[movie_idx]["score"]
+            ):
+                best_by_movie[movie_idx] = chunk_score
+
+        top = sorted(best_by_movie.values(), key=lambda c: c["score"], reverse=True)[:limit]
+
+        results = []
+        for chunk_score in top:
+            doc = self.documents[chunk_score["movie_idx"]]
+            results.append(
+                format_search_result(
+                    doc["id"],
+                    doc["title"],
+                    doc["description"][:100],
+                    chunk_score["score"],
+                    {"chunk_idx": chunk_score["chunk_idx"]},
+                )
+            )
+        return results
 
 
 def verify_model() -> None:
