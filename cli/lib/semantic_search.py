@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -68,18 +69,26 @@ class SemanticSearch:
         ]
 
 
-def chunk_text(text: str, chunk_size: int, overlap: int = 0) -> list[str]:
+def group_into_chunks(units: list[str], chunk_size: int, overlap: int) -> list[str]:
     if overlap < 0 or overlap >= chunk_size:
         raise ValueError("Overlap must be at least 0 and smaller than the chunk size")
-    words = text.split()
     chunks = []
-    for i in range(0, len(words), chunk_size - overlap):
-        chunk_words = words[i : i + chunk_size]
-        # Stop once a chunk would only repeat words already in the previous chunk
-        if chunks and len(chunk_words) <= overlap:
+    for i in range(0, len(units), chunk_size - overlap):
+        chunk_units = units[i : i + chunk_size]
+        # Stop once a chunk would only repeat units already in the previous chunk
+        if chunks and len(chunk_units) <= overlap:
             break
-        chunks.append(" ".join(chunk_words))
+        chunks.append(" ".join(chunk_units))
     return chunks
+
+
+def chunk_text(text: str, chunk_size: int, overlap: int = 0) -> list[str]:
+    return group_into_chunks(text.split(), chunk_size, overlap)
+
+
+def semantic_chunk_text(text: str, max_chunk_size: int, overlap: int = 0) -> list[str]:
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
+    return group_into_chunks(sentences, max_chunk_size, overlap)
 
 
 def verify_model() -> None:

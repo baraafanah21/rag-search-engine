@@ -5,6 +5,7 @@ from lib.semantic_search import (
     chunk_text,
     embed_query_text,
     embed_text,
+    semantic_chunk_text,
     verify_embeddings,
     verify_model,
 )
@@ -26,6 +27,12 @@ def search_command(query: str, limit: int) -> None:
 def chunk_command(text: str, chunk_size: int, overlap: int) -> None:
     print(f"Chunking {len(text)} characters")
     for i, chunk in enumerate(chunk_text(text, chunk_size, overlap), start=1):
+        print(f"{i}. {chunk}")
+
+
+def semantic_chunk_command(text: str, max_chunk_size: int, overlap: int) -> None:
+    print(f"Semantically chunking {len(text)} characters")
+    for i, chunk in enumerate(semantic_chunk_text(text, max_chunk_size, overlap), start=1):
         print(f"{i}. {chunk}")
 
 
@@ -60,6 +67,17 @@ def main() -> None:
         "--overlap", type=int, default=0, help="Number of words shared between chunks"
     )
 
+    semantic_chunk_parser = subparsers.add_parser(
+        "semantic_chunk", help="Split text into chunks of whole sentences"
+    )
+    semantic_chunk_parser.add_argument("text", type=str, help="Text to chunk")
+    semantic_chunk_parser.add_argument(
+        "--max-chunk-size", type=int, default=4, help="Maximum number of sentences per chunk"
+    )
+    semantic_chunk_parser.add_argument(
+        "--overlap", type=int, default=0, help="Number of sentences shared between chunks"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -75,6 +93,8 @@ def main() -> None:
             search_command(args.query, args.limit)
         case "chunk":
             chunk_command(args.text, args.chunk_size, args.overlap)
+        case "semantic_chunk":
+            semantic_chunk_command(args.text, args.max_chunk_size, args.overlap)
         case _:
             parser.print_help()
 
