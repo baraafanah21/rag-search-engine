@@ -1,3 +1,4 @@
+import json
 import os
 import re
 
@@ -9,6 +10,10 @@ from search_utils import load_movies
 MODEL_NAME = "all-MiniLM-L6-v2"
 CACHE_DIR = "cache"
 EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
+CHUNK_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "chunk_embeddings.npy")
+CHUNK_METADATA_PATH = os.path.join(CACHE_DIR, "chunk_metadata.json")
+CHUNK_MAX_SENTENCES = 4
+CHUNK_OVERLAP_SENTENCES = 1
 
 
 def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
@@ -23,8 +28,8 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
 
 
 class SemanticSearch:
-    def __init__(self) -> None:
-        self.model = SentenceTransformer(MODEL_NAME)
+    def __init__(self, model_name: str = MODEL_NAME) -> None:
+        self.model = SentenceTransformer(model_name)
         self.embeddings = None
         self.documents = None
         self.document_map: dict[int, dict] = {}
@@ -34,12 +39,12 @@ class SemanticSearch:
             raise ValueError("Cannot generate an embedding for empty text")
         return self.model.encode([text])[0]
 
-    def __set_documents(self, documents: list[dict]) -> None:
+    def _set_documents(self, documents: list[dict]) -> None:
         self.documents = documents
         self.document_map = {doc["id"]: doc for doc in documents}
 
     def build_embeddings(self, documents: list[dict]):
-        self.__set_documents(documents)
+        self._set_documents(documents)
         movie_strings = [f"{doc['title']}: {doc['description']}" for doc in documents]
         self.embeddings = self.model.encode(movie_strings, show_progress_bar=True)
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -47,7 +52,7 @@ class SemanticSearch:
         return self.embeddings
 
     def load_or_create_embeddings(self, documents: list[dict]):
-        self.__set_documents(documents)
+        self._set_documents(documents)
         if os.path.exists(EMBEDDINGS_PATH):
             self.embeddings = np.load(EMBEDDINGS_PATH)
             if len(self.embeddings) == len(documents):
@@ -89,6 +94,52 @@ def chunk_text(text: str, chunk_size: int, overlap: int = 0) -> list[str]:
 def semantic_chunk_text(text: str, max_chunk_size: int, overlap: int = 0) -> list[str]:
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
     return group_into_chunks(sentences, max_chunk_size, overlap)
+
+
+class ChunkedSemanticSearch(SemanticSearch):
+    def __init__(self, model_name: str = MODEL_NAME) -> None:
+        super().__init__(model_name)
+        self.chunk_embeddings = None
+        self.chunk_metadata = None
+
+    def build_chunk_embeddings(self, documents: list[dict]) -> np.ndarray:
+        self._set_documents(documents)
+        all_chunks: list[str] = []
+        chunk_metadata: list[dict] = []
+        for movie_idx, doc in enumerate(documents):
+            description = doc.get("description", "")
+            if not description.strip():
+                continue
+            chunks = semantic_chunk_text(
+                description, CHUNK_MAX_SENTENCES, CHUNK_OVERLAP_SENTENCES
+            )
+            for chunk_idx, chunk in enumerate(chunks):
+                all_chunks.append(chunk)
+                chunk_metadata.append(
+                    {
+                        "movie_idx": movie_idx,
+                        "chunk_idx": chunk_idx,
+                        "total_chunks": len(chunks),
+                    }
+                )
+
+        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
+        self.chunk_metadata = chunk_metadata
+
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        np.save(CHUNK_EMBEDDINGS_PATH, self.chunk_embeddings)
+        with open(CHUNK_METADATA_PATH, "w") as f:
+            json.dump({"chunks": chunk_metadata, "total_chunks": len(all_chunks)}, f, indent=2)
+        return self.chunk_embeddings
+
+    def load_or_create_chunk_embeddings(self, documents: list[dict]) -> np.ndarray:
+        self._set_documents(documents)
+        if os.path.exists(CHUNK_EMBEDDINGS_PATH) and os.path.exists(CHUNK_METADATA_PATH):
+            self.chunk_embeddings = np.load(CHUNK_EMBEDDINGS_PATH)
+            with open(CHUNK_METADATA_PATH, "r") as f:
+                self.chunk_metadata = json.load(f)["chunks"]
+            return self.chunk_embeddings
+        return self.build_chunk_embeddings(documents)
 
 
 def verify_model() -> None:
