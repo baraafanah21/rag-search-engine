@@ -92,8 +92,19 @@ def chunk_text(text: str, chunk_size: int, overlap: int = 0) -> list[str]:
 
 
 def semantic_chunk_text(text: str, max_chunk_size: int, overlap: int = 0) -> list[str]:
-    sentences = [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
-    return group_into_chunks(sentences, max_chunk_size, overlap)
+    text = text.strip()
+    if not text:
+        return []
+
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    # A single sentence with no closing punctuation is kept as the whole text
+    if len(sentences) == 1 and not sentences[0].endswith((".", "!", "?")):
+        sentences = [text]
+
+    sentences = [sentence.strip() for sentence in sentences]
+    sentences = [sentence for sentence in sentences if sentence]
+    chunks = group_into_chunks(sentences, max_chunk_size, overlap)
+    return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
 class ChunkedSemanticSearch(SemanticSearch):
