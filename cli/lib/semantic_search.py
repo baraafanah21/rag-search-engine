@@ -68,6 +68,11 @@ class SemanticSearch:
         ]
 
 
+def chunk_text(text: str, chunk_size: int) -> list[str]:
+    words = text.split()
+    return [" ".join(words[i : i + chunk_size]) for i in range(0, len(words), chunk_size)]
+
+
 def verify_model() -> None:
     search = SemanticSearch()
     print(f"Model loaded: {search.model}")

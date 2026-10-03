@@ -2,6 +2,7 @@ import argparse
 
 from lib.semantic_search import (
     SemanticSearch,
+    chunk_text,
     embed_query_text,
     embed_text,
     verify_embeddings,
@@ -20,6 +21,12 @@ def search_command(query: str, limit: int) -> None:
         print(f"{i}. {result['title']} (score: {result['score']:.4f})")
         print(f"  {result['description'][:DESCRIPTION_PREVIEW_LENGTH]}...")
         print()
+
+
+def chunk_command(text: str, chunk_size: int) -> None:
+    print(f"Chunking {len(text)} characters")
+    for i, chunk in enumerate(chunk_text(text, chunk_size), start=1):
+        print(f"{i}. {chunk}")
 
 
 def main() -> None:
@@ -44,6 +51,12 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Search query")
     search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results")
 
+    chunk_parser = subparsers.add_parser("chunk", help="Split text into fixed-size word chunks")
+    chunk_parser.add_argument("text", type=str, help="Text to chunk")
+    chunk_parser.add_argument(
+        "--chunk-size", type=int, default=200, help="Number of words per chunk"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -57,6 +70,8 @@ def main() -> None:
             embed_query_text(args.query)
         case "search":
             search_command(args.query, args.limit)
+        case "chunk":
+            chunk_command(args.text, args.chunk_size)
         case _:
             parser.print_help()
 
