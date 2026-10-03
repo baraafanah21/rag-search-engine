@@ -23,9 +23,9 @@ def search_command(query: str, limit: int) -> None:
         print()
 
 
-def chunk_command(text: str, chunk_size: int) -> None:
+def chunk_command(text: str, chunk_size: int, overlap: int) -> None:
     print(f"Chunking {len(text)} characters")
-    for i, chunk in enumerate(chunk_text(text, chunk_size), start=1):
+    for i, chunk in enumerate(chunk_text(text, chunk_size, overlap), start=1):
         print(f"{i}. {chunk}")
 
 
@@ -56,6 +56,9 @@ def main() -> None:
     chunk_parser.add_argument(
         "--chunk-size", type=int, default=200, help="Number of words per chunk"
     )
+    chunk_parser.add_argument(
+        "--overlap", type=int, default=0, help="Number of words shared between chunks"
+    )
 
     args = parser.parse_args()
 
@@ -71,7 +74,7 @@ def main() -> None:
         case "search":
             search_command(args.query, args.limit)
         case "chunk":
-            chunk_command(args.text, args.chunk_size)
+            chunk_command(args.text, args.chunk_size, args.overlap)
         case _:
             parser.print_help()
 

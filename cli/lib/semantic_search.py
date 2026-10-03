@@ -68,9 +68,18 @@ class SemanticSearch:
         ]
 
 
-def chunk_text(text: str, chunk_size: int) -> list[str]:
+def chunk_text(text: str, chunk_size: int, overlap: int = 0) -> list[str]:
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("Overlap must be at least 0 and smaller than the chunk size")
     words = text.split()
-    return [" ".join(words[i : i + chunk_size]) for i in range(0, len(words), chunk_size)]
+    chunks = []
+    for i in range(0, len(words), chunk_size - overlap):
+        chunk_words = words[i : i + chunk_size]
+        # Stop once a chunk would only repeat words already in the previous chunk
+        if chunks and len(chunk_words) <= overlap:
+            break
+        chunks.append(" ".join(chunk_words))
+    return chunks
 
 
 def verify_model() -> None:
