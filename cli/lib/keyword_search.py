@@ -4,7 +4,7 @@ import pickle
 from collections import Counter
 
 from constants import BM25_B, BM25_K1
-from search_utils import load_movies, tokenize
+from search_utils import format_search_result, load_movies, tokenize
 
 CACHE_DIR = "cache"
 INDEX_PATH = os.path.join(CACHE_DIR, "index.pkl")
@@ -18,6 +18,7 @@ class InvertedIndex:
         self.docmap: dict[int, dict] = {}
         self.term_frequencies: dict[int, Counter] = {}
         self.doc_lengths: dict[int, int] = {}
+        self.index_path = INDEX_PATH
         self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
 
     def __add_document(self, doc_id: int, text: str) -> None:
@@ -65,13 +66,18 @@ class InvertedIndex:
     def bm25(self, doc_id: int, term: str) -> float:
         return self.get_bm25_tf(doc_id, term) * self.get_bm25_idf(term)
 
-    def bm25_search(self, query: str, limit: int) -> list[tuple[dict, float]]:
+    def bm25_search(self, query: str, limit: int) -> list[dict]:
         query_tokens = tokenize(query)
         scores: dict[int, float] = {}
         for doc_id in self.docmap:
             scores[doc_id] = sum(self.bm25(doc_id, token) for token in query_tokens)
         ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-        return [(self.docmap[doc_id], score) for doc_id, score in ranked[:limit]]
+        return [
+            format_search_result(
+                doc_id, self.docmap[doc_id]["title"], self.docmap[doc_id]["description"], score
+            )
+            for doc_id, score in ranked[:limit]
+        ]
 
     def get_tf_idf(self, doc_id: int, term: str) -> float:
         return self.get_tf(doc_id, term) * self.get_idf(term)
@@ -84,7 +90,7 @@ class InvertedIndex:
 
     def save(self) -> None:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(INDEX_PATH, "wb") as f:
+        with open(self.index_path, "wb") as f:
             pickle.dump(self.index, f)
         with open(DOCMAP_PATH, "wb") as f:
             pickle.dump(self.docmap, f)
@@ -94,7 +100,7 @@ class InvertedIndex:
             pickle.dump(self.doc_lengths, f)
 
     def load(self) -> None:
-        with open(INDEX_PATH, "rb") as f:
+        with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(DOCMAP_PATH, "rb") as f:
             self.docmap = pickle.load(f)
