@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from constants import BM25_B, BM25_K1
-from inverted_index import InvertedIndex
+from lib.keyword_search import InvertedIndex
 from search_utils import tokenize, tokenize_term
 
 MAX_RESULTS = 5
@@ -77,8 +77,8 @@ def bm25_tf_command(
 def bm25_search_command(query: str, limit: int) -> None:
     index = load_index()
     results = index.bm25_search(query, limit)
-    for i, (movie, score) in enumerate(results, start=1):
-        print(f"{i}. ({movie['id']}) {movie['title']} - Score: {score:.2f}")
+    for i, result in enumerate(results, start=1):
+        print(f"{i}. ({result['id']}) {result['title']} - Score: {result['score']:.2f}")
 
 
 def build_command() -> None:
