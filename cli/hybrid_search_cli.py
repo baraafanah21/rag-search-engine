@@ -1,6 +1,7 @@
 import argparse
 
 from lib.hybrid_search import HybridSearch, normalize_scores
+from lib.query_enhancement import enhance_query
 from search_utils import load_movies
 
 DESCRIPTION_PREVIEW_LENGTH = 100
@@ -25,7 +26,12 @@ def format_rank(rank: int | None) -> str:
     return str(rank) if rank is not None else "-"
 
 
-def rrf_search_command(query: str, k: int, limit: int) -> None:
+def rrf_search_command(query: str, k: int, limit: int, enhance: str | None) -> None:
+    if enhance:
+        enhanced_query = enhance_query(query, enhance)
+        print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
+        query = enhanced_query
+
     search = HybridSearch(load_movies())
     results = search.rrf_search(query, k, limit)
     for i, result in enumerate(results[:limit], start=1):
@@ -63,6 +69,12 @@ def main() -> None:
     rrf_parser.add_argument("query", type=str, help="Search query")
     rrf_parser.add_argument("-k", type=int, default=60, help="RRF k constant")
     rrf_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results")
+    rrf_parser.add_argument(
+        "--enhance",
+        type=str,
+        choices=["spell"],
+        help="Query enhancement method",
+    )
 
     args = parser.parse_args()
 
@@ -72,7 +84,7 @@ def main() -> None:
         case "weighted-search":
             weighted_search_command(args.query, args.alpha, args.limit)
         case "rrf-search":
-            rrf_search_command(args.query, args.k, args.limit)
+            rrf_search_command(args.query, args.k, args.limit, args.enhance)
         case _:
             parser.print_help()
 
