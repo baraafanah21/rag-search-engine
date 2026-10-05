@@ -21,6 +21,10 @@ def hybrid_score(bm25_score: float, semantic_score: float, alpha: float = 0.5) -
     return alpha * bm25_score + (1 - alpha) * semantic_score
 
 
+def rrf_score(rank: int, k: int = 60) -> float:
+    return 1 / (k + rank)
+
+
 class HybridSearch:
     def __init__(self, documents: list[dict]) -> None:
         self.documents = documents
@@ -46,11 +50,12 @@ class HybridSearch:
         semantic_scores = normalize_scores([r["score"] for r in semantic_results])
 
         combined: dict[int, dict] = {}
+        defaults = {"bm25_score": 0.0, "semantic_score": 0.0}
         for result, score in zip(bm25_results, bm25_scores):
-            combined.setdefault(result["id"], self._new_combined_result(result["id"]))
+            combined.setdefault(result["id"], self._new_combined_result(result["id"], defaults))
             combined[result["id"]]["bm25_score"] = score
         for result, score in zip(semantic_results, semantic_scores):
-            combined.setdefault(result["id"], self._new_combined_result(result["id"]))
+            combined.setdefault(result["id"], self._new_combined_result(result["id"], defaults))
             combined[result["id"]]["semantic_score"] = score
 
         for result in combined.values():
@@ -61,15 +66,30 @@ class HybridSearch:
         ranked = sorted(combined.values(), key=lambda r: r["hybrid_score"], reverse=True)
         return ranked[:limit]
 
-    def _new_combined_result(self, doc_id: int) -> dict:
+    def rrf_search(self, query: str, k: int, limit: int = 10) -> list[dict]:
+        candidate_limit = limit * SEARCH_CANDIDATE_MULTIPLIER
+        bm25_results = self._bm25_search(query, candidate_limit)
+        semantic_results = self.semantic_search.search_chunks(query, candidate_limit)
+
+        combined: dict[int, dict] = {}
+        defaults = {"bm25_rank": None, "semantic_rank": None, "rrf_score": 0.0}
+        for rank, result in enumerate(bm25_results, start=1):
+            combined.setdefault(result["id"], self._new_combined_result(result["id"], defaults))
+            combined[result["id"]]["bm25_rank"] = rank
+            combined[result["id"]]["rrf_score"] += rrf_score(rank, k)
+        for rank, result in enumerate(semantic_results, start=1):
+            combined.setdefault(result["id"], self._new_combined_result(result["id"], defaults))
+            combined[result["id"]]["semantic_rank"] = rank
+            combined[result["id"]]["rrf_score"] += rrf_score(rank, k)
+
+        ranked = sorted(combined.values(), key=lambda r: r["rrf_score"], reverse=True)
+        return ranked[:limit]
+
+    def _new_combined_result(self, doc_id: int, defaults: dict) -> dict:
         doc = self.document_map[doc_id]
         return {
             "id": doc_id,
             "title": doc["title"],
             "document": doc["description"],
-            "bm25_score": 0.0,
-            "semantic_score": 0.0,
+            **defaults,
         }
-
-    def rrf_search(self, query: str, k: int, limit: int = 10) -> list[dict]:
-        raise NotImplementedError("RRF hybrid search is not implemented yet.")
