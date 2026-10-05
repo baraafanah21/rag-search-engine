@@ -59,11 +59,31 @@ User query: "{query}"
     return rewritten or query
 
 
+def expand_query(query: str) -> str:
+    prompt = f"""Expand the user-provided movie search query below with related terms.
+
+Add synonyms and related concepts that might appear in movie descriptions.
+Keep expansions relevant and focused.
+Output only the additional terms; they will be appended to the original query.
+
+Examples:
+- "scary bear movie" -> "scary horror grizzly bear movie terrifying film"
+- "action movie with bear" -> "action thriller bear chase fight adventure"
+- "comedy with bear" -> "comedy funny bear humor lighthearted"
+
+User query: "{query}"
+"""
+    extra_terms = ask_llm(prompt).strip('"')
+    return f"{query} {extra_terms}" if extra_terms else query
+
+
 def enhance_query(query: str, method: str | None) -> str:
     match method:
         case "spell":
             return spell_correct_query(query)
         case "rewrite":
             return rewrite_query(query)
+        case "expand":
+            return expand_query(query)
         case _:
             return query
