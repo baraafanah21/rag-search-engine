@@ -2,9 +2,12 @@ import argparse
 
 from lib.hybrid_search import HybridSearch, normalize_scores
 from lib.query_enhancement import enhance_query
+from lib.reranking import rerank
 from search_utils import load_movies
 
 DESCRIPTION_PREVIEW_LENGTH = 100
+# Re-rank a wider pool than requested so the LLM can promote lower-ranked matches
+RERANK_CANDIDATE_MULTIPLIER = 5
 
 
 def normalize_command(scores: list[float]) -> None:
@@ -26,13 +29,32 @@ def format_rank(rank: int | None) -> str:
     return str(rank) if rank is not None else "-"
 
 
-def rrf_search_command(query: str, k: int, limit: int, enhance: str | None) -> None:
+def rrf_search_command(
+    query: str, k: int, limit: int, enhance: str | None, rerank_method: str | None
+) -> None:
     if enhance:
         enhanced_query = enhance_query(query, enhance)
         print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
         query = enhanced_query
 
     search = HybridSearch(load_movies())
+
+    if rerank_method:
+        results = search.rrf_search(query, k, limit * RERANK_CANDIDATE_MULTIPLIER)
+        print(f"Re-ranking top {limit} results using {rerank_method} method...")
+        results = rerank(query, results, rerank_method)
+        print(f"Reciprocal Rank Fusion Results for '{query}' (k={k}):")
+        for i, result in enumerate(results[:limit], start=1):
+            print(f"\n{i}. {result['title']}")
+            print(f"   Re-rank Score: {result['rerank_score']:.3f}/10")
+            print(f"   RRF Score: {result['rrf_score']:.3f}")
+            print(
+                f"   BM25 Rank: {format_rank(result['bm25_rank'])}, "
+                f"Semantic Rank: {format_rank(result['semantic_rank'])}"
+            )
+            print(f"   {result['document'][:DESCRIPTION_PREVIEW_LENGTH]}...")
+        return
+
     results = search.rrf_search(query, k, limit)
     for i, result in enumerate(results[:limit], start=1):
         print(f"{i}. {result['title']}")
@@ -75,6 +97,12 @@ def main() -> None:
         choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
     )
+    rrf_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        choices=["individual"],
+        help="LLM re-ranking method",
+    )
 
     args = parser.parse_args()
 
@@ -84,7 +112,9 @@ def main() -> None:
         case "weighted-search":
             weighted_search_command(args.query, args.alpha, args.limit)
         case "rrf-search":
-            rrf_search_command(args.query, args.k, args.limit, args.enhance)
+            rrf_search_command(
+                args.query, args.k, args.limit, args.enhance, args.rerank_method
+            )
         case _:
             parser.print_help()
 
