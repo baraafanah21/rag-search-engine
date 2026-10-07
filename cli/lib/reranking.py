@@ -2,11 +2,14 @@ import json
 import re
 import time
 
+from sentence_transformers import CrossEncoder
+
 from .query_enhancement import ask_llm
 
 # Pause between LLM calls to stay under OpenRouter's free-tier rate limit
 LLM_CALL_DELAY_SECONDS = 3
 BATCH_DESCRIPTION_LENGTH = 300
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-TinyBERT-L2-v2"
 
 
 def parse_score(text: str) -> float:
@@ -84,11 +87,22 @@ Ranking:"""
     return sorted(docs, key=lambda d: d["rerank_rank"])
 
 
+def rerank_cross_encoder(query: str, docs: list[dict]) -> list[dict]:
+    pairs = [[query, f"{doc.get('title', '')} - {doc.get('document', '')}"] for doc in docs]
+    cross_encoder = CrossEncoder(CROSS_ENCODER_MODEL)
+    scores = cross_encoder.predict(pairs)
+    for doc, score in zip(docs, scores):
+        doc["cross_encoder_score"] = float(score)
+    return sorted(docs, key=lambda d: d["cross_encoder_score"], reverse=True)
+
+
 def rerank(query: str, docs: list[dict], method: str) -> list[dict]:
     match method:
         case "individual":
             return rerank_individual(query, docs)
         case "batch":
             return rerank_batch(query, docs)
+        case "cross_encoder":
+            return rerank_cross_encoder(query, docs)
         case _:
             raise ValueError(f"Unknown rerank method: {method}")
