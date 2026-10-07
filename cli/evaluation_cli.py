@@ -27,6 +27,12 @@ def recall_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
     return hits / len(set(relevant))
 
 
+def f1_score(precision: float, recall: float) -> float:
+    if precision + recall == 0:
+        return 0.0
+    return 2 * (precision * recall) / (precision + recall)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Search Evaluation CLI")
     parser.add_argument(
@@ -49,11 +55,13 @@ def main() -> None:
         retrieved = [result["title"] for result in results]
         precision = precision_at_k(retrieved, relevant, limit)
         recall = recall_at_k(retrieved, relevant, limit)
+        f1 = f1_score(precision, recall)
 
         print()
         print(f"- Query: {query}")
         print(f"  - Precision@{limit}: {precision:.4f}")
         print(f"  - Recall@{limit}: {recall:.4f}")
+        print(f"  - F1 Score: {f1:.4f}")
         print(f"  - Retrieved: {', '.join(retrieved)}")
         print(f"  - Relevant: {', '.join(relevant)}")
 
