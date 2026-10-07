@@ -46,7 +46,10 @@ def rrf_search_command(
         print(f"Reciprocal Rank Fusion Results for '{query}' (k={k}):")
         for i, result in enumerate(results[:limit], start=1):
             print(f"\n{i}. {result['title']}")
-            print(f"   Re-rank Score: {result['rerank_score']:.3f}/10")
+            if rerank_method == "batch":
+                print(f"   Re-rank Rank: {result['rerank_rank']}")
+            else:
+                print(f"   Re-rank Score: {result['rerank_score']:.3f}/10")
             print(f"   RRF Score: {result['rrf_score']:.3f}")
             print(
                 f"   BM25 Rank: {format_rank(result['bm25_rank'])}, "
@@ -100,7 +103,7 @@ def main() -> None:
     rrf_parser.add_argument(
         "--rerank-method",
         type=str,
-        choices=["individual"],
+        choices=["individual", "batch"],
         help="LLM re-ranking method",
     )
 
