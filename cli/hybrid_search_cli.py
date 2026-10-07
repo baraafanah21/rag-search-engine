@@ -1,4 +1,6 @@
 import argparse
+import logging
+import sys
 
 from lib.hybrid_search import HybridSearch, normalize_scores
 from lib.query_enhancement import enhance_query
@@ -8,6 +10,24 @@ from search_utils import load_movies
 DESCRIPTION_PREVIEW_LENGTH = 100
 # Re-rank a wider pool than requested so the LLM can promote lower-ranked matches
 RERANK_CANDIDATE_MULTIPLIER = 5
+
+logger = logging.getLogger("hybrid_search")
+
+
+def enable_debug_logging() -> None:
+    # Only our logger, so library loggers (httpx, transformers) stay quiet
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("[DEBUG] %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+
+def log_results(stage: str, results: list[dict]) -> None:
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    logger.debug(f"{stage} ({len(results)} results):")
+    for i, result in enumerate(results, start=1):
+        logger.debug(f"  {i}. ({result['id']}) {result['title']}")
 
 
 def normalize_command(scores: list[float]) -> None:
@@ -32,17 +52,21 @@ def format_rank(rank: int | None) -> str:
 def rrf_search_command(
     query: str, k: int, limit: int, enhance: str | None, rerank_method: str | None
 ) -> None:
+    logger.debug(f"Original query: '{query}'")
     if enhance:
         enhanced_query = enhance_query(query, enhance)
         print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
         query = enhanced_query
+    logger.debug(f"Query after enhancement ({enhance or 'none'}): '{query}'")
 
     search = HybridSearch(load_movies())
 
     if rerank_method:
         results = search.rrf_search(query, k, limit * RERANK_CANDIDATE_MULTIPLIER)
+        log_results("RRF search results", results)
         print(f"Re-ranking top {limit} results using {rerank_method} method...")
         results = rerank(query, results, rerank_method)
+        log_results(f"Final results after {rerank_method} re-ranking", results[:limit])
         print(f"Reciprocal Rank Fusion Results for '{query}' (k={k}):")
         for i, result in enumerate(results[:limit], start=1):
             print(f"\n{i}. {result['title']}")
@@ -62,6 +86,8 @@ def rrf_search_command(
         return
 
     results = search.rrf_search(query, k, limit)
+    log_results("RRF search results", results)
+    log_results("Final results (no re-ranking)", results[:limit])
     for i, result in enumerate(results[:limit], start=1):
         print(f"{i}. {result['title']}")
         print(f"  RRF Score: {result['rrf_score']:.3f}")
@@ -109,8 +135,13 @@ def main() -> None:
         choices=["individual", "batch", "cross_encoder"],
         help="LLM re-ranking method",
     )
+    rrf_parser.add_argument(
+        "--debug", action="store_true", help="Log each pipeline stage to stderr"
+    )
 
     args = parser.parse_args()
+    if getattr(args, "debug", False):
+        enable_debug_logging()
 
     match args.command:
         case "normalize":
