@@ -3,6 +3,7 @@ import logging
 import sys
 
 from lib.hybrid_search import HybridSearch, normalize_scores
+from lib.llm_judge import MAX_RELEVANCE_SCORE, judge_results
 from lib.query_enhancement import enhance_query
 from lib.reranking import rerank
 from search_utils import load_movies
@@ -49,8 +50,20 @@ def format_rank(rank: int | None) -> str:
     return str(rank) if rank is not None else "-"
 
 
+def print_evaluation(query: str, results: list[dict]) -> None:
+    scores = judge_results(query, results)
+    print()
+    for i, (result, score) in enumerate(zip(results, scores), start=1):
+        print(f"{i}. {result['title']}: {score}/{MAX_RELEVANCE_SCORE}")
+
+
 def rrf_search_command(
-    query: str, k: int, limit: int, enhance: str | None, rerank_method: str | None
+    query: str,
+    k: int,
+    limit: int,
+    enhance: str | None,
+    rerank_method: str | None,
+    evaluate: bool = False,
 ) -> None:
     logger.debug(f"Original query: '{query}'")
     if enhance:
@@ -83,6 +96,8 @@ def rrf_search_command(
                 f"Semantic Rank: {format_rank(result['semantic_rank'])}"
             )
             print(f"   {result['document'][:DESCRIPTION_PREVIEW_LENGTH]}...")
+        if evaluate:
+            print_evaluation(query, results[:limit])
         return
 
     results = search.rrf_search(query, k, limit)
@@ -97,6 +112,8 @@ def rrf_search_command(
         )
         print(f"  {result['document'][:DESCRIPTION_PREVIEW_LENGTH]}...")
         print()
+    if evaluate:
+        print_evaluation(query, results[:limit])
 
 
 def main() -> None:
@@ -138,6 +155,9 @@ def main() -> None:
     rrf_parser.add_argument(
         "--debug", action="store_true", help="Log each pipeline stage to stderr"
     )
+    rrf_parser.add_argument(
+        "--evaluate", action="store_true", help="Have an LLM rate each result's relevance 0-3"
+    )
 
     args = parser.parse_args()
     if getattr(args, "debug", False):
@@ -150,7 +170,12 @@ def main() -> None:
             weighted_search_command(args.query, args.alpha, args.limit)
         case "rrf-search":
             rrf_search_command(
-                args.query, args.k, args.limit, args.enhance, args.rerank_method
+                args.query,
+                args.k,
+                args.limit,
+                args.enhance,
+                args.rerank_method,
+                args.evaluate,
             )
         case _:
             parser.print_help()
