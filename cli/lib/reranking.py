@@ -45,7 +45,7 @@ def rerank_individual(query: str, docs: list[dict]) -> list[dict]:
     return sorted(docs, key=lambda d: d["rerank_score"], reverse=True)
 
 
-def parse_ranked_ids(text: str) -> list[int]:
+def parse_json_int_list(text: str) -> list[int]:
     # Some models wrap JSON in a Markdown code block despite being told not to
     text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
     return [int(doc_id) for doc_id in json.loads(text.strip())]
@@ -73,7 +73,7 @@ For example:
 [75, 12, 34, 2, 1]
 
 Ranking:"""
-    ranked_ids = parse_ranked_ids(ask_llm(prompt))
+    ranked_ids = parse_json_int_list(ask_llm(prompt))
 
     rank_by_id: dict[int, int] = {}
     for doc_id in ranked_ids:
