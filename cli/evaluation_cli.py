@@ -19,6 +19,14 @@ def precision_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
     return hits / k
 
 
+def recall_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
+    if not relevant:
+        return 0.0
+    retrieved_set = set(retrieved[:k])
+    hits = sum(1 for title in set(relevant) if title in retrieved_set)
+    return hits / len(set(relevant))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Search Evaluation CLI")
     parser.add_argument(
@@ -40,10 +48,12 @@ def main() -> None:
         results = search.rrf_search(query, RRF_K, limit)
         retrieved = [result["title"] for result in results]
         precision = precision_at_k(retrieved, relevant, limit)
+        recall = recall_at_k(retrieved, relevant, limit)
 
         print()
         print(f"- Query: {query}")
         print(f"  - Precision@{limit}: {precision:.4f}")
+        print(f"  - Recall@{limit}: {recall:.4f}")
         print(f"  - Retrieved: {', '.join(retrieved)}")
         print(f"  - Relevant: {', '.join(relevant)}")
 
